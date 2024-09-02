@@ -256,8 +256,12 @@ class OpenAIConversationEntity(
                     response=intent_response, conversation_id=conversation_id
                 )
 
-            LOGGER.debug("Response %s", result)
-            response = result.choices[0].message
+            if hasattr(result, "choices"):
+                LOGGER.debug("Response %s", result)
+                response = result.choices[0].message
+            else:
+                LOGGER.warning("Conversation Response %s", result)
+                response = ChatCompletionMessage(content=f'{result}')
 
             def message_convert(
                 message: ChatCompletionMessage,
