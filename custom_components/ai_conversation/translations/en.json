@@ -5,7 +5,8 @@
         "description": "{tip}",
         "data": {
           "base": "API Base",
-          "api_key": "API Key"
+          "api_key": "API Key",
+          "model": "Completion Model"
         }
       }
     },

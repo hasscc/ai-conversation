@@ -79,6 +79,7 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_BASE, default=dat.get(CONF_BASE, 'https://api.openai.com/v1')): str,
                 vol.Optional(CONF_API_KEY, default=dat.get(CONF_API_KEY)): str,
+                vol.Optional(CONF_CHAT_MODEL, default=dat.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)): str,
             }
         )
         if user_input is None:
@@ -97,10 +98,14 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         except Exception as exc:
             self.context['tip'] = f'⚠️ {exc}'
         else:
+            model = user_input.pop(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
             return self.async_create_entry(
                 title="ChatGPT",
                 data=user_input,
-                options=RECOMMENDED_OPTIONS,
+                options={
+                    **RECOMMENDED_OPTIONS,
+                    CONF_CHAT_MODEL: model,
+                },
             )
 
         return self.async_show_form(
