@@ -49,7 +49,7 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_BASE): str,
+        vol.Required(CONF_BASE, default='https://api.openai.com/v1'): str,
         vol.Optional(CONF_API_KEY): str,
     }
 )
@@ -62,10 +62,7 @@ RECOMMENDED_OPTIONS = {
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
-    """Validate the user input allows us to connect.
-
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
+    """Validate the user input allows us to connect."""
     client = openai.AsyncOpenAI(api_key=data.get(CONF_API_KEY, ""), base_url=data[CONF_BASE])
     messages = [
         ChatCompletionUserMessageParam(role="user", content="hello"),
@@ -86,9 +83,16 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
+        dat = user_input or {}
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_BASE, default=dat.get(CONF_BASE, 'https://api.openai.com/v1')): str,
+                vol.Optional(CONF_API_KEY, default=dat.get(CONF_API_KEY)): str,
+            }
+        )
         if user_input is None:
             return self.async_show_form(
-                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
+                step_id="user", data_schema=schema
             )
 
         errors = {}
@@ -99,9 +103,8 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             errors["base"] = "cannot_connect"
         except openai.AuthenticationError:
             errors["base"] = "invalid_auth"
-        except Exception:
-            _LOGGER.exception("Unexpected exception")
-            errors["base"] = "unknown"
+        except Exception as exc:
+            self.context['tip'] = f'⚠️ {exc}'
         else:
             return self.async_create_entry(
                 title="ChatGPT",
@@ -110,7 +113,8 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="user", data_schema=schema, errors=errors,
+            description_placeholders={'tip': self.context.pop('tip', '')},
         )
 
     @staticmethod

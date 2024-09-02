@@ -2,6 +2,7 @@
   "config": {
     "step": {
       "user": {
+        "description": "{tip}",
         "data": {
           "base": "API Base",
           "api_key": "API Key"
