@@ -35,7 +35,6 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
-    CONF_RECOMMENDED,
     CONF_TEMPERATURE,
     CONF_TOP_P,
     DOMAIN,
@@ -47,15 +46,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-STEP_USER_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_BASE, default='https://api.openai.com/v1'): str,
-        vol.Optional(CONF_API_KEY): str,
-    }
-)
-
 RECOMMENDED_OPTIONS = {
-    CONF_RECOMMENDED: True,
     CONF_LLM_HASS_API: llm.LLM_API_ASSIST,
     CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,
 }
