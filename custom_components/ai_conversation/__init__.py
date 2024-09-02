@@ -23,7 +23,7 @@ from homeassistant.helpers.typing import ConfigType
 from .const import DOMAIN, LOGGER
 
 SERVICE_GENERATE_IMAGE = "generate_image"
-PLATFORMS = (Platform.CONVERSATION)
+PLATFORMS = (Platform.CONVERSATION,)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
