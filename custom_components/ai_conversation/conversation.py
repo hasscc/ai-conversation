@@ -261,7 +261,7 @@ class OpenAIConversationEntity(
                 response = result.choices[0].message
             else:
                 LOGGER.warning("Conversation Response %s", result)
-                response = ChatCompletionMessage(content=f'{result}')
+                response = ChatCompletionMessage(content=str(result), role='assistant')
 
             def message_convert(
                 message: ChatCompletionMessage,
