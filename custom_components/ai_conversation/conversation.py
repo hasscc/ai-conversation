@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 import json
+import re
 from typing import Any, Literal
 
 import openai
@@ -47,6 +48,14 @@ from .const import (
 
 # Max number of back and forth with the LLM to generate a response
 MAX_TOOL_ITERATIONS = 10
+
+ASSIST_PROMPT = """
+As a HomeAssistant intent parser, analyze the device name and area from the conversation,
+and generate a response sentence describing the operation completion.
+Use the fields intent, name, area, and response to reply in a JSON structure, without any other description.
+When no area is specified, do not return it in the JSON.
+Respond with a normal conversation when there is no matching intent.
+""".strip()
 
 
 async def async_setup_entry(
@@ -186,10 +195,13 @@ class OpenAIConversationEntity(
         ):
             user_name = user.name
 
+        intents = ', '.join([tool.name for tool in llm_api.tools])
         try:
             prompt_parts = [
                 template.Template(
                     llm.BASE_PROMPT
+                    + ASSIST_PROMPT
+                    + f'\nThe following intents are supported: {intents}\n'
                     + options.get(CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT),
                     self.hass,
                 ).async_render(
@@ -197,6 +209,7 @@ class OpenAIConversationEntity(
                         "ha_name": self.hass.config.location_name,
                         "user_name": user_name,
                         "llm_context": llm_context,
+                        "language": user_input.language,
                     },
                     parse_result=False,
                 )
@@ -280,6 +293,27 @@ class OpenAIConversationEntity(
                         )
                         for tool_call in message.tool_calls
                     ]
+
+                elif message.content:
+                    intent_json = None
+                    if message.content.startswith("{"):
+                        intent_json = message.content
+                    elif match := re.match(r"```json\s*(.*)\s*```", message.content):
+                        intent_json = match.group(1)
+                    try:
+                        intent_data = json.loads(intent_json or "{}")
+                    except ValueError:
+                        intent_data = {}
+                    LOGGER.info("Intent data: %s", intent_data or message.content)
+                    message.content = intent_data.pop("response", message.content)
+                    if intent_name := intent_data.pop("intent", None):
+                        tool_calls = [
+                            ChatCompletionMessageToolCallParam(
+                                id=f'call_{ulid.ulid_now()}', type='function',
+                                function=Function(name=intent_name, arguments=json.dumps(intent_data)),
+                            )
+                        ]
+
                 param = ChatCompletionAssistantMessageParam(
                     role=message.role,
                     content=message.content,
