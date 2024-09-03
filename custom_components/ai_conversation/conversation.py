@@ -11,13 +11,15 @@ from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessage,
     ChatCompletionMessageParam,
+    ChatCompletionMessageToolCall,
     ChatCompletionMessageToolCallParam,
     ChatCompletionSystemMessageParam,
     ChatCompletionToolMessageParam,
     ChatCompletionToolParam,
     ChatCompletionUserMessageParam,
 )
-from openai.types.chat.chat_completion_message_tool_call_param import Function
+from openai.types.chat.chat_completion_message_tool_call import Function
+from openai.types.chat.chat_completion_message_tool_call_param import Function as FunctionParam
 from openai.types.shared_params import FunctionDefinition
 import voluptuous as vol
 from voluptuous_openapi import convert
@@ -281,20 +283,8 @@ class OpenAIConversationEntity(
             ) -> ChatCompletionMessageParam:
                 """Convert from class to TypedDict."""
                 tool_calls: list[ChatCompletionMessageToolCallParam] = []
-                if message.tool_calls:
-                    tool_calls = [
-                        ChatCompletionMessageToolCallParam(
-                            id=tool_call.id,
-                            function=Function(
-                                arguments=tool_call.function.arguments,
-                                name=tool_call.function.name,
-                            ),
-                            type=tool_call.type,
-                        )
-                        for tool_call in message.tool_calls
-                    ]
 
-                elif message.content:
+                if not message.tool_calls and message.content:
                     intent_json = None
                     if message.content.startswith("{"):
                         intent_json = message.content
@@ -306,13 +296,26 @@ class OpenAIConversationEntity(
                         intent_data = {}
                     LOGGER.info("Intent data: %s", intent_data or message.content)
                     message.content = intent_data.pop("response", message.content)
-                    if intent_name := intent_data.pop("intent", None):
-                        tool_calls = [
-                            ChatCompletionMessageToolCallParam(
+                    if intent_name := intent_data.pop("intent", ""):
+                        message.tool_calls = [
+                            ChatCompletionMessageToolCall(
                                 id=f'call_{ulid.ulid_now()}', type='function',
                                 function=Function(name=intent_name, arguments=json.dumps(intent_data)),
                             )
                         ]
+
+                if message.tool_calls:
+                    tool_calls = [
+                        ChatCompletionMessageToolCallParam(
+                            id=tool_call.id,
+                            function=FunctionParam(
+                                arguments=tool_call.function.arguments,
+                                name=tool_call.function.name,
+                            ),
+                            type=tool_call.type,
+                        )
+                        for tool_call in message.tool_calls
+                    ]
 
                 param = ChatCompletionAssistantMessageParam(
                     role=message.role,
