@@ -360,6 +360,12 @@ class OpenAIConversationEntity(
 
         intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response.content or "")
+        if xiaoai := options.get('xiaoai_entity'):
+            await self.hass.services.async_call('xiaomi_miot', 'intelligent_speaker', {
+                'entity_id': xiaoai,
+                'text': response.content,
+                'execute': False,
+            })
         return conversation.ConversationResult(
             response=intent_response, conversation_id=conversation_id
         )

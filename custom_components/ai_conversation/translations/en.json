@@ -24,7 +24,8 @@
           "model": "Completion Model",
           "max_tokens": "Maximum tokens to return in response",
           "temperature": "Temperature",
-          "top_p": "Top P"
+          "top_p": "Top P",
+          "xiaoai_entity": "Xiaoai Entity"
         }
       }
     }

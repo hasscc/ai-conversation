@@ -209,6 +209,11 @@ def openai_config_option_schema(
             description={"suggested_value": options.get(CONF_TEMPERATURE)},
             default=RECOMMENDED_TEMPERATURE,
         ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),
+        vol.Optional(
+            'xiaoai_entity',
+            description={"suggested_value": options.get('xiaoai_entity')},
+            default='',
+        ): str,
     }
 
     return schema
