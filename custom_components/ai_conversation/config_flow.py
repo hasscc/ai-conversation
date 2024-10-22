@@ -59,7 +59,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
         ChatCompletionUserMessageParam(role="user", content="hello"),
     ]
     await client.chat.completions.create(
-        model=RECOMMENDED_CHAT_MODEL,
+        model=data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
         messages=messages,
         user=ulid.ulid_now(),
     )
@@ -100,8 +100,10 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             self.context['tip'] = f'⚠️ {exc}'
         else:
             model = user_input.pop(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
+            domain = user_input.get(CONF_BASE, '')
+            domain = f'{domain}//'.split('/')[2]
             return self.async_create_entry(
-                title="ChatGPT",
+                title=domain or 'ChatGPT',
                 data=user_input,
                 options={
                     **RECOMMENDED_OPTIONS,
