@@ -1,6 +1,5 @@
 # 🤖 AI Conversation Agent
 
-<a name="install"></a>
 ## Install
 
 #### Method 1: [HACS](https://my.home-assistant.io/redirect/hacs_repository/?category=integration&owner=hasscc&repository=ai-conversation)
@@ -8,7 +7,7 @@
 #### Method 2: Manually installation via Samba / SFTP
 > Download and copy `custom_components/ai_conversation` folder to `custom_components` folder in your HomeAssistant config folder
 
-#### Method 3: Onkey shell via SSH / Terminal & SSH add-on
+#### Method 3: Onekey shell via SSH / Terminal & SSH add-on
 ```shell
 wget -O - https://get.hacs.vip | DOMAIN=ai_conversation REPO_PATH=hasscc/ai-conversation ARCHIVE_TAG=main bash -
 ```
