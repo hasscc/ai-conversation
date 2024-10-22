@@ -6,7 +6,7 @@
         "data": {
           "base": "API Base",
           "api_key": "API Key",
-          "model": "Completion Model"
+          "chat_model": "Completion Model"
         }
       }
     },
@@ -20,8 +20,11 @@
     "step": {
       "init": {
         "data": {
+          "base": "API Base",
+          "api_key": "API Key",
+          "chat_model": "Completion Model",
           "prompt": "Prompt Template",
-          "model": "Completion Model",
+          "llm_hass_api": "LLM Hass API",
           "max_tokens": "Maximum tokens to return in response",
           "temperature": "Temperature",
           "top_p": "Top P",

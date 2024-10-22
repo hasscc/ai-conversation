@@ -286,10 +286,11 @@ class OpenAIConversationEntity(
 
                 if not message.tool_calls and message.content:
                     intent_json = None
-                    if message.content.startswith("{"):
-                        intent_json = message.content
-                    elif match := re.match(r"```json\s*(.*)\s*```", message.content):
+                    reg = re.compile(r"```json\s*([\s\S]*)\s*```", re.MULTILINE)
+                    if match := reg.match(message.content):
                         intent_json = match.group(1)
+                    elif message.content.startswith("{"):
+                        intent_json = message.content
                     try:
                         intent_data = json.loads(intent_json or "{}")
                     except ValueError:
@@ -355,6 +356,8 @@ class OpenAIConversationEntity(
                         content=json.dumps(tool_response),
                     )
                 )
+
+            break
 
         self.history[conversation_id] = messages
 
