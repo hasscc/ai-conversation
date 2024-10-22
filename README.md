@@ -29,7 +29,9 @@ wget -O - https://get.hacs.vip | DOMAIN=ai_conversation REPO_PATH=hasscc/ai-conv
 
 [![Config AI Conversation](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ai_conversation)
 
+
 ## Links
 
+- [智谱AI免费模型](https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D)
 - [New API](https://github.com/Calcium-Ion/new-api)
 - [LLM Red Team](https://github.com/LLM-Red-Team)
