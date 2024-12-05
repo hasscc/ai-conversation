@@ -18,7 +18,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.const import CONF_BASE, CONF_API_KEY, CONF_LLM_HASS_API
+from homeassistant.const import CONF_BASE, CONF_SERVICE, CONF_API_KEY, CONF_LLM_HASS_API
 from homeassistant.core import HomeAssistant
 from homeassistant.util import ulid
 from homeassistant.helpers import llm
@@ -51,15 +51,42 @@ RECOMMENDED_OPTIONS = {
     CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,
 }
 
+OPENAI_API = 'https://api.openai.com/v1'
+ZHI_PU_API = 'https://open.bigmodel.cn/api/paas/v4'
+SERVICES = {
+    OPENAI_API: {
+        'name': 'OpenAI',
+        'model': RECOMMENDED_CHAT_MODEL,
+    },
+    ZHI_PU_API: {
+        'name': '智谱AI',
+        'model': 'glm-4-flash',
+    },
+}
+
+OPEN_APIS = {
+    k: v['name']
+    for k, v in SERVICES.items()
+}
+
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
     """Validate the user input allows us to connect."""
-    client = openai.AsyncOpenAI(api_key=data.get(CONF_API_KEY, ""), base_url=data[CONF_BASE])
-    messages = [
-        ChatCompletionUserMessageParam(role="user", content="hello"),
-    ]
+    url = data.get(CONF_SERVICE, OPENAI_API)
+    url = data.get(CONF_BASE, '').replace('/chat/completions', '') or url
+    key = data.get(CONF_API_KEY, '')
+
+    if not key and url == ZHI_PU_API:
+        lnk = 'https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D'
+        raise ValueError(f'智谱AI为用户提供了免费的大模型，[立即注册]({lnk})免费使用！')
+
+    model = data.get(CONF_CHAT_MODEL) or SERVICES.get(url, {}).get('model', RECOMMENDED_CHAT_MODEL)
+    data[CONF_BASE] = url
+    data[CONF_CHAT_MODEL] = model
+    client = openai.AsyncOpenAI(api_key=key, base_url=url)
+    messages = [ChatCompletionUserMessageParam(role='user', content='hello')]
     await client.chat.completions.create(
-        model=data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
+        model=model,
         messages=messages,
         user=ulid.ulid_now(),
     )
@@ -74,45 +101,41 @@ class OpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
+        errors = {}
         dat = user_input or {}
+        if dat:
+            try:
+                await validate_input(self.hass, dat)
+            except openai.APIConnectionError:
+                errors["base"] = "cannot_connect"
+            except openai.AuthenticationError:
+                errors["base"] = "invalid_auth"
+            except Exception as exc:
+                self.context['tip'] = f'⚠️ {exc}'
+            else:
+                dat.pop(CONF_SERVICE, None)
+                model = dat.pop(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
+                domain = dat.get(CONF_BASE, '')
+                domain = f'{domain}//'.split('/')[2]
+                return self.async_create_entry(
+                    title=domain or 'ChatGPT',
+                    data=dat,
+                    options={
+                        **RECOMMENDED_OPTIONS,
+                        CONF_CHAT_MODEL: model,
+                    },
+                )
+
         schema = vol.Schema(
             {
-                vol.Required(CONF_BASE, default=dat.get(CONF_BASE, 'https://api.openai.com/v1')): str,
-                vol.Optional(CONF_API_KEY, default=dat.get(CONF_API_KEY)): str,
-                vol.Optional(CONF_CHAT_MODEL, default=dat.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)): str,
+                vol.Optional(CONF_SERVICE, default=dat.get(CONF_SERVICE, OPENAI_API)): vol.In(OPEN_APIS),
+                vol.Optional(CONF_BASE, default=dat.get(CONF_BASE, '')): str,
+                vol.Optional(CONF_API_KEY, default=dat.get(CONF_API_KEY, '')): str,
+                vol.Optional(CONF_CHAT_MODEL, default=dat.get(CONF_CHAT_MODEL, '')): str,
             }
         )
-        if user_input is None:
-            return self.async_show_form(
-                step_id="user", data_schema=schema,
-                description_placeholders={'tip': self.context.pop('tip', '')},
-            )
-
-        errors = {}
-
-        try:
-            await validate_input(self.hass, user_input)
-        except openai.APIConnectionError:
-            errors["base"] = "cannot_connect"
-        except openai.AuthenticationError:
-            errors["base"] = "invalid_auth"
-        except Exception as exc:
-            self.context['tip'] = f'⚠️ {exc}'
-        else:
-            model = user_input.pop(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
-            domain = user_input.get(CONF_BASE, '')
-            domain = f'{domain}//'.split('/')[2]
-            return self.async_create_entry(
-                title=domain or 'ChatGPT',
-                data=user_input,
-                options={
-                    **RECOMMENDED_OPTIONS,
-                    CONF_CHAT_MODEL: model,
-                },
-            )
-
         return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors,
+            step_id='user', data_schema=schema, errors=errors,
             description_placeholders={'tip': self.context.pop('tip', '')},
         )
 
