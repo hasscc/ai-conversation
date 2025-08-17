@@ -16,15 +16,18 @@ ZHI_PU_API = "https://open.bigmodel.cn/api/paas/v4"
 SERVICES = {
     ZHI_PU_API: {
         CONF_NAME: "智谱AI",
-        CONF_MODEL: "glm-4.5-flash",
+        "models": [
+            "glm-4.1v-thinking-flash", "glm-4.5-flash", "glm-4-flash-250414", "glm-4v-flash", "glm-z1-flash",
+            "cogview-3-flash", "cogvideox-flash",
+        ],
     },
     OPENAI_API: {
         CONF_NAME: "OpenAI",
-        CONF_MODEL: "gpt-4o-mini",
+        "models": ["gpt-4o", "gpt-4o-mini"],
     },
     CONF_CUSTOM: {
         CONF_NAME: "Custom (自定义)",
-        CONF_MODEL: "",
+        "models": [""],
     },
 }
 
@@ -83,7 +86,6 @@ class BasicFlow(config_entries.ConfigEntryBaseFlow, HasAttrs):
         defaults.update(user_input)
         if service and service in SERVICES:
             defaults.setdefault(CONF_BASE, service if service != CONF_CUSTOM else "")
-            defaults.setdefault(CONF_MODEL, SERVICES[service].get("model", ""))
 
         schema = {
             vol.Required(CONF_BASE): str,
@@ -158,7 +160,21 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
 
     async def async_step_user(self, user_input=None):
         """Add a subentry."""
-        return await self.async_step_init(None)
+        entry = self._get_entry()
+        base = entry.data.get(CONF_BASE, "")
+        added_models = [
+            sub.data[CONF_MODEL]
+            for sub in entry.subentries.values()
+        ]
+        model = ""
+        for m in SERVICES.get(base, {}).get("models", []):
+            if m not in added_models:
+                model = m
+                break
+        defaults = {
+            CONF_MODEL: model,
+        }
+        return await self.async_step_init(user_input, defaults)
 
     async def async_step_reconfigure(self, user_input=None):
         """Handle reconfiguration of a subentry."""
