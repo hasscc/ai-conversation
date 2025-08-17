@@ -124,7 +124,8 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
         ])
         res = {'url': url}
         tags = res.setdefault('tags', [])
-        msg = result.choices[0].message.content if result.choices else ''
+        message = result.choices[0].message if result.choices else None
+        msg = message.content if message else ''
         arr = msg.split('```json')
         try:
             jss = str(arr[1].split('```')[0] if len(arr) > 1 else arr[0])
@@ -136,5 +137,7 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
             res['error'] = str(exc)
             res['result'] = result.to_dict(mode='json')
         res['message'] = msg
+        if message and hasattr(message, 'reasoning_content'):
+            res['reasoning'] = message.reasoning_content
         res['usage'] = result.usage.to_dict() if result.usage else None
         return res
