@@ -1,0 +1,62 @@
+{
+  "config": {
+    "flow_title": "配置集成",
+    "step": {
+      "user": {
+        "title": "开始配置",
+        "description": "{tip}",
+        "data": {
+          "service": "服务商",
+          "base": "接口",
+          "api_key": "密钥"
+        },
+        "data_description": {
+          "base": "例如: `https://api.openai.com/v1`\n<br/><br/>\n"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "已存在"
+    },
+    "error": {
+      "cannot_connect": "无法连接",
+      "invalid_auth": "非法授权"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "集成选项",
+        "description": "{tip}",
+        "data": {
+          "service": "服务商",
+          "base": "接口",
+          "api_key": "密钥"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "entry_type": "对话模型",
+      "initiate_flow": {
+        "user": "添加对话模型",
+        "reconfigure": "配置对话模型"
+      },
+      "step": {
+        "init": {
+          "description": "{tip}",
+          "data": {
+            "model": "模型",
+            "prompt": "提示词",
+            "llm_hass_api": "控制 Home Assistant"
+          },
+          "data_description": {
+            "model": "指定该对话要使用的模型"
+          }
+        }
+      }
+    }
+  },
+  "entity": {}
+}

@@ -1,0 +1,28 @@
+explain_media:
+  description: 分析图片或视频
+  fields:
+    entity_id:
+      description: 选择一个支持视觉模型的对话实体
+      required: true
+      selector:
+        entity:
+          integration: ai_conversation
+          domain: conversation
+    prompt:
+      description: 提示词
+      example: 分析并总结
+      selector:
+        text:
+    video:
+      description: 视频URL
+      selector:
+        text:
+    image:
+      description: 图片URL (与视频二选一)
+      selector:
+        text:
+    tags:
+      description: 识别标签
+      example: '[回家, 离家, 敲门, 快递, 外卖]'
+      selector:
+        object:
