@@ -81,8 +81,7 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
         try:
             result = await client.chat.completions.create(**data)
         except openai.OpenAIError as err:
-            LOGGER.error("Error talking to API: %s", err)
-            raise HomeAssistantError("Error talking to API") from err
+            raise HomeAssistantError(f"Error talking to API: {data}") from err
         return result
 
     async def async_explain_media(self, prompt='', image=None, video=None, tags=None, **kwargs):
@@ -96,7 +95,7 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
             url = async_process_play_media_url(self.hass, url)
         if not url.startswith('http'):
             return {'error': f'url error: {url}'}
-        internal = get_url(self.hass)
+        internal = get_url(self.hass, prefer_external=False)
         external = get_url(self.hass, prefer_external=True)
         url = url.replace(internal, external)
         if not prompt:
@@ -124,17 +123,18 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
             {'role': 'user', 'content': content},
         ])
         res = {'url': url}
-        msg = result.choices[0].message.content
+        tags = res.setdefault('tags', [])
+        msg = result.choices[0].message.content if result.choices else ''
         arr = msg.split('```json')
         try:
             jss = str(arr[1].split('```')[0] if len(arr) > 1 else arr[0])
-            dat = json.loads(jss.strip())
+            dat = json.loads(jss.strip() or '{}')
             msg = dat.get('message', '')
-            if tags := dat.get('tags'):
-                res['tags'] = tags
-                res['tags_string'] = ' '.join(map(lambda x: f'#{x}', tags))
+            tags.extend(dat.get('tags', []))
+            res['tags_string'] = ' '.join(map(lambda x: f'#{x}', tags))
         except Exception as exc:
             res['error'] = str(exc)
+            res['result'] = result.to_dict(mode='json')
         res['message'] = msg
         res['usage'] = result.usage.to_dict() if result.usage else None
         return res
