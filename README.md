@@ -54,6 +54,31 @@ usage:
 ```
 
 
+## MCP Server
+
+This component provides an MCP server to pass the user's smart home needs to the Home Assistant's conversation agent.
+
+You may create a Long-lived access token to allow the client to access the API.
+1. Visit your account profile settings, under the Security tab. [![Home Assistant user's security options.](https://my.home-assistant.io/badges/profile_security.svg)](https://my.home-assistant.io/redirect/profile_security/)
+2. Create a Long-lived access token.
+3. Copy the access token to use when configuring the MCP client LLM application.
+
+```yaml
+{
+  "mcpServers": {
+    "ha_conversation": {
+      "name": "Home Assistant",
+      "type": "sse",
+      "baseUrl": "http://homeassistant.local:8123/ai_conversation/sse",
+      "headers": {
+        "Authorization": "Bearer YourLong-livedAccessToken"
+      }
+    }
+  }
+}
+```
+
+
 ## Links
 
 - [智谱AI免费模型](https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D)

@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import openai
 from homeassistant.helpers.entity import Entity
+
+from . import http
 from .const import *
 from .services import ServiceManager
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up integration."""
-    servicer = ServiceManager(hass)
-    servicer.setup_explain_media()
+    hass.data.setdefault(DOMAIN, {})
+    http.async_register(hass)
+    ServiceManager(hass).setup_explain_media()
     return True
 
 
