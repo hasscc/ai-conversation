@@ -77,6 +77,10 @@ You may create a Long-lived access token to allow the client to access the API.
   }
 }
 ```
+If you want to specify a conversation agent, you can add the query parameter `agent_id`.
+```yaml
+"baseUrl": "http://homeassistant.local:8123/ai_conversation/sse?agent_id=conversation.glm_4_flash",
+```
 
 
 ## Links
