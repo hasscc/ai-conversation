@@ -20,7 +20,7 @@
     },
     "error": {
       "cannot_connect": "无法连接",
-      "invalid_auth": "非法授权"
+      "invalid_auth": "授权失败"
     }
   },
   "options": {
@@ -34,6 +34,10 @@
           "api_key": "密钥"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "无法连接",
+      "invalid_auth": "授权失败"
     }
   },
   "config_subentries": {

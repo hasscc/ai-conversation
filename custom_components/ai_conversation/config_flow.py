@@ -51,7 +51,11 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
         hdrs.AUTHORIZATION: f"Bearer {key}",
     })
     resp = await res.json()
-    LOGGER.info('validate_input: %s', [data, resp])
+    if res.status == 401:
+        error = resp.get("error", resp) if isinstance(resp, dict) else resp
+        text = error.get("message") or str(error)
+        raise web_exceptions.HTTPUnauthorized(body=text)
+    LOGGER.info('validate_input: %s', [data, resp, res])
 
 class HasAttrs:
     attrs = None
@@ -105,7 +109,7 @@ class BasicFlow(config_entries.ConfigEntryBaseFlow, HasAttrs):
                 errors["base"] = "cannot_connect"
             except web_exceptions.HTTPUnauthorized as exc:
                 errors["base"] = "invalid_auth"
-                self.tip = f'🔐 {exc}'
+                self.tip = f'🔐 {exc.text or exc}'
             except Exception as exc:
                 self.tip = f'⚠️ {exc}'
             else:
