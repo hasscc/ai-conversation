@@ -42,6 +42,8 @@ class ModelContextProtocolSSEView(HomeAssistantView):
         if not agent_id:
             from . import HassEntry
             for entry in HassEntry.ALL.values():
+                if not entry.get_config(CONF_LLM_HASS_API):
+                    continue
                 for entity in entry.entities.values():
                     if not isinstance(entity, conversation.ConversationEntity):
                         continue

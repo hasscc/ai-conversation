@@ -1,7 +1,5 @@
 import json
-import openai
 
-from homeassistant.components import conversation
 from homeassistant.components.conversation import (
     DOMAIN as ENTITY_DOMAIN,
     ConversationEntity as BaseEntity,
@@ -17,6 +15,9 @@ from homeassistant.components.media_player.browse_media import async_process_pla
 
 from . import HassEntry, BasicEntity
 from .const import *
+from .schemas import *
+
+MAX_TOOL_ITERATIONS = 10
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
     """Set up conversation entities."""
@@ -71,17 +72,65 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
         await self._async_handle_chat_log(chat_log)
         return conversation.async_get_result_from_chat_log(user_input, chat_log)
 
+    async def _async_handle_chat_log(
+        self,
+        chat_log: conversation.ChatLog,
+        structure_name: str | None = None,
+        structure: vol.Schema | None = None,
+    ) -> None:
+        data = ChatCompletions(
+            model=self.model,
+            user=chat_log.conversation_id,
+        )
+
+        for content in chat_log.content:
+            if msg := ChatMessage.from_conversation_content(content):
+                data.messages.append(msg)
+
+        if chat_log.llm_api:
+            for tool in chat_log.llm_api.tools:
+                func = ChatTool.from_hass_llm_tool(tool, chat_log.llm_api.custom_serializer)
+                data.tools.append(func)
+
+        if structure and structure_name:
+            schema = ResponseJsonSchema(structure_name, structure, chat_log.llm_api)
+            data.response_format = schema
+            if ".bigmodel.cn..." in self.entry.get_config(CONF_BASE):
+                data.response_format = Dict(type="json_object")
+                data.messages.append(ChatMessage(
+                    role="system",
+                    content=(
+                        "Please ensure that the response is in JSON schema:"
+                        f"{json.dumps(schema.schema)}"
+                    ),
+                ))
+
+        for _iteration in range(MAX_TOOL_ITERATIONS):
+            result = await self.async_chat_completions(**data)
+            data.messages.extend(
+                [
+                    msg
+                    async for content in chat_log.async_add_delta_content_stream(
+                        self.entity_id, result.message.to_conversation_content_delta()
+                    )
+                    if (msg := ChatMessage.from_conversation_content(content))
+                ]
+            )
+            if not chat_log.unresponded_tool_results:
+                break
+
     async def async_chat_completions(self, messages, **kwargs):
-        client = await self.entry.async_get_client()
-        data = {
-            "model": self.model,
-            "messages": messages,
-            **kwargs,
-        }
+        model = kwargs.pop("model", None) or self.model
+        data = ChatCompletions(model=model, messages=messages, **kwargs)
         try:
-            result = await client.chat.completions.create(**data)
-        except openai.OpenAIError as err:
-            raise HomeAssistantError(f"Error talking to API: {data}") from err
+            result = await self.entry.async_chat_completions(data)
+        except Exception as err:
+            LOGGER.exception('chat_completions error: %s', data, exc_info=True)
+            raise HomeAssistantError(f"Error talking to API: {err}") from err
+        LOGGER.debug('chat_completions req: %s', data)
+        if result.error:
+            raise HomeAssistantError(f"Error talking to API: {result.error}")
+        LOGGER.debug('chat_completions rsp: %s', result)
         return result
 
     async def async_explain_media(self, prompt='', image=None, video=None, tags=None, **kwargs):
@@ -93,7 +142,7 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
             url = media.url
         if not url.startswith('http'):
             url = async_process_play_media_url(self.hass, url)
-        if not url.startswith('http'):
+        if not url.startswith('http') and video:
             return {'error': f'url error: {url}'}
         internal = get_url(self.hass, prefer_external=False)
         external = get_url(self.hass, prefer_external=True)
@@ -124,20 +173,21 @@ class ConversationEntity(BasicEntity, BaseEntity, OpenRouterEntity):
         ])
         res = {'url': url}
         tags = res.setdefault('tags', [])
-        message = result.choices[0].message if result.choices else None
+        message = result.message
         msg = message.content if message else ''
-        arr = msg.split('```json')
-        try:
-            jss = str(arr[1].split('```')[0] if len(arr) > 1 else arr[0])
-            dat = json.loads(jss.strip() or '{}')
-            msg = dat.get('message', '')
-            tags.extend(dat.get('tags', []))
-            res['tags_string'] = ' '.join(map(lambda x: f'#{x}', tags))
-        except Exception as exc:
-            res['error'] = str(exc)
-            res['result'] = result.to_dict(mode='json')
+        if '```' in msg:
+            arr = msg.split('```json')
+            try:
+                jss = str(arr[1].split('```')[0] if len(arr) > 1 else arr[0])
+                dat = json.loads(jss.strip() or '{}')
+                msg = dat.get('message', '')
+                tags.extend(dat.get('tags', []))
+                res['tags_string'] = ' '.join(map(lambda x: f'#{x}', tags))
+            except Exception as exc:
+                res['error'] = str(exc)
+                res['result'] = result.to_dict()
         res['message'] = msg
-        if message and hasattr(message, 'reasoning_content'):
+        if message and 'reasoning_content' in message:
             res['reasoning'] = message.reasoning_content
-        res['usage'] = result.usage.to_dict() if result.usage else None
+        res['usage'] = result.usage
         return res

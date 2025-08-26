@@ -1,11 +1,13 @@
 """The Conversation integration."""
 from __future__ import annotations
 
-import openai
+from aiohttp import hdrs
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from . import http
 from .const import *
+from .schemas import *
 from .services import ServiceManager
 
 
@@ -37,6 +39,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
 class HassEntry:
     ALL: dict[str, "HassEntry"] = {}
     client = None
+    session = None
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
         self.id = entry.entry_id
@@ -49,21 +52,8 @@ class HassEntry:
         this = HassEntry.ALL.get(entry.entry_id)
         if not this:
             this = HassEntry(hass, entry)
-            await this.async_get_client()
             HassEntry.ALL[this.id] = this
         return this
-
-    async def async_get_client(self):
-        if client := getattr(self.entry, "runtime_data", None):
-            return client
-        def get_client(entry: ConfigEntry):
-            return openai.AsyncOpenAI(
-                api_key=entry.data.get(CONF_API_KEY, ""),
-                base_url=entry.data[CONF_BASE],
-            )
-        client = await self.hass.async_add_executor_job(get_client, self.entry)
-        self.entry.runtime_data = client
-        return client
 
     async def async_unload(self):
         ret = await self.hass.config_entries.async_unload_platforms(self.entry, PLATFORMS)
@@ -82,6 +72,23 @@ class HassEntry:
         if key:
             return dat.get(key, default)
         return dat
+
+    def get_http_session(self):
+        if self.session:
+            return self.session
+        base_url = self.get_config(CONF_BASE).rstrip('/')
+        self.session = async_create_clientsession(self.hass, base_url=f"{base_url}/")
+        return self.session
+
+    async def async_chat_completions(self, data: ChatCompletions):
+        http = self.get_http_session()
+        headers = {
+            hdrs.AUTHORIZATION: f"Bearer {self.get_config(CONF_API_KEY)}",
+        }
+        res = await http.post('chat/completions', json=data, headers=headers)
+        result = ChatCompletionsResult(await res.json())
+        result.response = res
+        return result
 
 
 class BasicEntity(Entity):

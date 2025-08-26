@@ -1,3 +1,4 @@
+from aiohttp import hdrs, client_exceptions, web_exceptions
 from homeassistant import config_entries
 from homeassistant.helpers import llm
 from homeassistant.helpers.selector import (
@@ -6,9 +7,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     TemplateSelector,
 )
-from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-import openai
 from .const import *
 
 OPENAI_API = "https://api.openai.com/v1"
@@ -46,9 +46,12 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
         lnk = "https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D"
         raise ValueError(f"智谱AI为用户提供了免费的大模型，[立即注册]({lnk})免费使用！")
 
-    client = openai.AsyncOpenAI(api_key=key, base_url=url, http_client=get_async_client(hass))
-    models = await client.models.list(timeout=10.0)
-    LOGGER.info('validate_input: %s', [data, models])
+    session = async_create_clientsession(hass, base_url=f"{url.rstrip('/')}/")
+    res = await session.get("models", timeout=10.0, headers={
+        hdrs.AUTHORIZATION: f"Bearer {key}",
+    })
+    resp = await res.json()
+    LOGGER.info('validate_input: %s', [data, resp])
 
 class HasAttrs:
     attrs = None
@@ -98,9 +101,9 @@ class BasicFlow(config_entries.ConfigEntryBaseFlow, HasAttrs):
             user_input[CONF_BASE] = base
             try:
                 await validate_input(self.hass, user_input)
-            except openai.APIConnectionError:
+            except client_exceptions.ClientConnectionError:
                 errors["base"] = "cannot_connect"
-            except openai.AuthenticationError as exc:
+            except web_exceptions.HTTPUnauthorized as exc:
                 errors["base"] = "invalid_auth"
                 self.tip = f'🔐 {exc}'
             except Exception as exc:
@@ -173,6 +176,7 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
                 break
         defaults = {
             CONF_MODEL: model,
+            CONF_LLM_HASS_API: [llm.LLM_API_ASSIST],
         }
         return await self.async_step_init(user_input, defaults)
 
@@ -189,8 +193,14 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
                 user_input.pop(CONF_LLM_HASS_API, None)
             name = user_input.get(CONF_NAME, "")
             model = user_input[CONF_MODEL]
-            return self.async_create_entry(
-                title=f"{name} ({model})".strip(), data=user_input
+            if self.source == "user":
+                return self.async_create_entry(
+                    title=f"{name} ({model})".strip(), data=user_input
+                )
+            return self.async_update_and_abort(
+                self._get_entry(),
+                self._get_reconfigure_subentry(),
+                data=user_input,
             )
 
         hass_apis: list[SelectOptionDict] = [
@@ -201,7 +211,7 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
             vol.Required(CONF_MODEL): str,
             vol.Optional(CONF_NAME, default="Agent"): str,
             vol.Optional(CONF_PROMPT, default=""): TemplateSelector(),
-            vol.Optional(CONF_LLM_HASS_API, default=[llm.LLM_API_ASSIST]):
+            vol.Optional(CONF_LLM_HASS_API, default=[]):
                 SelectSelector(SelectSelectorConfig(options=hass_apis, multiple=True)),
         }
         return self.async_show_form(

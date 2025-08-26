@@ -55,6 +55,9 @@
             "model": "指定该对话要使用的模型"
           }
         }
+      },
+      "abort": {
+        "reconfigure_successful": "配置成功"
       }
     }
   },
