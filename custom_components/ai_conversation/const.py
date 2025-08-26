@@ -10,12 +10,14 @@ from homeassistant.const import (  # noqa
     CONF_MODEL, CONF_LLM_HASS_API, MATCH_ALL,
     ATTR_ENTITY_ID,
 )
+from homeassistant.util import slugify  # noqa
 from homeassistant.exceptions import HomeAssistantError  # noqa
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry  # noqa
 
 DOMAIN = "ai_conversation"
 LOGGER = logging.getLogger(__package__)
 
+MAX_TOOL_ITERATIONS = 10
 CONF_CUSTOM = "custom"
 CONF_PROMPT = "prompt"
 

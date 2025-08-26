@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from aiohttp import hdrs
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import Entity, async_generate_entity_id
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from . import http
@@ -93,15 +94,96 @@ class HassEntry:
 
 class BasicEntity(Entity):
     domain = DOMAIN
+    _object_id = None
+    _default_name = "Agent"
 
     def __init__(self, entry: HassEntry, subentry: Optional[ConfigSubentry] = None):
         self.hass = entry.hass
         self.entry = entry
         self.subentry = subentry
+        self.model = self.subentry.data.get(CONF_MODEL, "")
+        self._attr_name = entry.get_config(CONF_NAME) or self._default_name
+        self._attr_unique_id = f'{self.domain}.{self.subentry.subentry_id}'
+        self._attr_device_info = dr.DeviceInfo(
+            identifiers={(DOMAIN, self.subentry.subentry_id)},
+            name=self.subentry.title,
+            model=self.model,
+            manufacturer="SomeAI",
+            entry_type=dr.DeviceEntryType.SERVICE,
+        )
         self.on_init()
+        if self._object_id is None:
+            self._object_id = slugify(self._attr_name) + "_{}"
+        self.entity_id = async_generate_entity_id(
+            f'{self.domain}.{self._object_id}',
+            name=self.model,
+            hass=self.hass,
+        )
 
     def on_init(self):
         pass
 
     async def async_added_to_hass(self):
         self.entry.entities[self.entity_id] = self
+
+    async def _async_handle_chat_log(
+        self,
+        chat_log: conversation.ChatLog,
+        structure_name: str | None = None,
+        structure: vol.Schema | None = None,
+    ) -> None:
+        data = ChatCompletions(
+            model=self.model,
+            user=chat_log.conversation_id,
+        )
+
+        for content in chat_log.content:
+            if msg := ChatMessage.from_conversation_content(content):
+                data.messages.append(msg)
+
+        if chat_log.llm_api:
+            for tool in chat_log.llm_api.tools:
+                func = ChatTool.from_hass_llm_tool(tool, chat_log.llm_api.custom_serializer)
+                data.tools.append(func)
+
+        if structure and structure_name:
+            schema = ResponseJsonSchema(structure_name, structure, chat_log.llm_api)
+            data.response_format = schema
+            if "bigmodel.cn" in self.entry.get_config(CONF_BASE):
+                # https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8#body-response-format
+                data.response_format = Dict(type="json_object")
+                data.messages.append(ChatMessage(
+                    role="system",
+                    content=(
+                        "Please ensure that the response is in JSON schema:"
+                        f"{json.dumps(schema.schema)}"
+                    ),
+                ))
+
+        for _iteration in range(MAX_TOOL_ITERATIONS):
+            result = await self.async_chat_completions(**data)
+            data.messages.extend(
+                [
+                    msg
+                    async for content in chat_log.async_add_delta_content_stream(
+                        self.entity_id, result.message.to_conversation_content_delta()
+                    )
+                    if (msg := ChatMessage.from_conversation_content(content))
+                ]
+            )
+            if not chat_log.unresponded_tool_results:
+                break
+
+    async def async_chat_completions(self, messages, **kwargs):
+        model = kwargs.pop("model", None) or self.model
+        data = ChatCompletions(model=model, messages=messages, **kwargs)
+        try:
+            result = await self.entry.async_chat_completions(data)
+        except Exception as err:
+            LOGGER.exception('chat_completions error: %s', data, exc_info=True)
+            raise HomeAssistantError(f"Error talking to API: {err}") from err
+        LOGGER.debug('chat_completions req: %s', data)
+        if result.error:
+            raise HomeAssistantError(f"Error talking to API: {result.error}")
+        LOGGER.debug('chat_completions rsp: %s', result)
+        return result

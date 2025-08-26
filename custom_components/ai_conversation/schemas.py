@@ -62,9 +62,9 @@ class ChatMessage(Dict):
         if self.tool_calls:
             data["tool_calls"] = [
                 llm.ToolInput(
-                    id=tool_call.id,
-                    tool_name=tool_call.function.name,
-                    tool_args=json.loads(tool_call.function.arguments),
+                    id=tool_call["id"],
+                    tool_name=tool_call["function"]["name"],
+                    tool_args=json.loads(tool_call["function"]["arguments"]),
                 )
                 for tool_call in self.tool_calls
             ]
