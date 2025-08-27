@@ -71,8 +71,9 @@ class ConversationEntity(BasicEntity, BaseEntity):
         external = get_url(self.hass, prefer_external=True)
         url = url.replace(internal, external)
         if not prompt:
-            prompt = 'Analyze and summarize'
-        if tags:
+            prompt = 'Analyze and summarize.'
+        json_mode = not not tags
+        if json_mode:
             prompt += '''
             Please ensure that the response is in JSON schema:
             {
@@ -98,7 +99,7 @@ class ConversationEntity(BasicEntity, BaseEntity):
         tags = res.setdefault('tags', [])
         message = result.message
         msg = message.content if message else ''
-        if '```' in msg:
+        if json_mode:
             arr = msg.split('```json')
             try:
                 jss = str(arr[1].split('```')[0] if len(arr) > 1 else arr[0])
