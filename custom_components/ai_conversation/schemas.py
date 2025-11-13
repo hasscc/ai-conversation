@@ -3,6 +3,8 @@ from homeassistant.helpers import llm
 from homeassistant.components import conversation
 from voluptuous_openapi import convert
 
+from .const import LOGGER
+
 
 class Dict(dict):
     def __getattr__(self, item):
@@ -130,8 +132,13 @@ class ChatCompletionsResult(Dict):
     def choices(self):
         choices = self.get("choices", [])
         for choice in choices:
-            if "message" in choice:
-                choice["message"] = ChatMessage(**choice["message"])
+            message = choice.get("message")
+            if not message:
+                 continue
+            elif "content" in message:
+                choice["message"] = ChatMessage(**message)
+            else:
+                LOGGER.info("Unknown message: %s", message)
         return choices
 
     @property
