@@ -102,13 +102,13 @@ class BasicEntity(Entity):
         self.entry = entry
         self.subentry = subentry
         self.model = self.subentry.data.get(CONF_MODEL, "")
-        self._attr_name = entry.get_config(CONF_NAME) or self._default_name
+        self._attr_name = self.subentry.data.get(CONF_NAME) or f"{self._default_name} {self.model}"
         self._attr_unique_id = f'{self.domain}.{self.subentry.subentry_id}'
         self._attr_device_info = dr.DeviceInfo(
             identifiers={(DOMAIN, self.subentry.subentry_id)},
             name=self.subentry.title,
             model=self.model,
-            manufacturer="SomeAI",
+            manufacturer=entry.title,
             entry_type=dr.DeviceEntryType.SERVICE,
         )
         self.on_init()

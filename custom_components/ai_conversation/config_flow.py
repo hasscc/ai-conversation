@@ -17,8 +17,8 @@ SERVICES = {
     ZHI_PU_API: {
         CONF_NAME: "智谱AI",
         "models": [
-            "glm-4.1v-thinking-flash", "glm-4.5-flash", "glm-4-flash-250414", "glm-4v-flash", "glm-z1-flash",
-            "cogview-3-flash", "cogvideox-flash",
+            "glm-4.6v-flash", "glm-4.1v-thinking-flash", "glm-4.5-flash", "glm-4-flash-250414", "glm-4v-flash",
+            "glm-z1-flash", "cogview-3-flash", "cogvideox-flash",
         ],
     },
     OPENAI_API: {
@@ -213,7 +213,7 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
         ]
         schema = {
             vol.Required(CONF_MODEL): str,
-            vol.Optional(CONF_NAME, default="Agent"): str,
+            vol.Optional(CONF_NAME, default=""): str,
             vol.Optional(CONF_PROMPT, default=""): TemplateSelector(),
             vol.Optional(CONF_LLM_HASS_API, default=[]):
                 SelectSelector(SelectSelectorConfig(options=hass_apis, multiple=True)),
