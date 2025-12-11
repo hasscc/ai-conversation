@@ -102,7 +102,8 @@ class BasicEntity(Entity):
         self.entry = entry
         self.subentry = subentry
         self.model = self.subentry.data.get(CONF_MODEL, "")
-        self._attr_name = self.subentry.data.get(CONF_NAME) or f"{self._default_name} {self.model}"
+        name = self.subentry.data.get(CONF_NAME) or self._default_name
+        self._attr_name = f"{name} ({self.model})"
         self._attr_unique_id = f'{self.domain}.{self.subentry.subentry_id}'
         self._attr_device_info = dr.DeviceInfo(
             identifiers={(DOMAIN, self.subentry.subentry_id)},
@@ -113,7 +114,7 @@ class BasicEntity(Entity):
         )
         self.on_init()
         if self._object_id is None:
-            self._object_id = slugify(self._attr_name) + "_{}"
+            self._object_id = slugify(self._default_name) + "_{}"
         self.entity_id = async_generate_entity_id(
             f'{self.domain}.{self._object_id}',
             name=self.model,
@@ -162,6 +163,8 @@ class BasicEntity(Entity):
 
         for _iteration in range(MAX_TOOL_ITERATIONS):
             result = await self.async_chat_completions(**data)
+            if not result.message:
+                continue
             data.messages.extend(
                 [
                     msg
@@ -185,5 +188,8 @@ class BasicEntity(Entity):
         LOGGER.debug('chat_completions req: %s', data)
         if result.error:
             raise HomeAssistantError(f"Error talking to API: {result.error}")
-        LOGGER.debug('chat_completions rsp: %s', result)
+        if not result.message:
+            LOGGER.warning('chat_completions response has no message: %s', result)
+        else:
+            LOGGER.debug('chat_completions rsp: %s', result.message)
         return result

@@ -52,8 +52,9 @@
           "description": "{tip}",
           "data": {
             "model": "模型",
+            "name": "名称",
             "prompt": "提示词",
-            "llm_hass_api": "控制 Home Assistant"
+            "llm_hass_api": "控制 & 工具"
           },
           "data_description": {
             "model": "指定该对话要使用的模型"

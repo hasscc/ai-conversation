@@ -37,7 +37,7 @@ OPEN_APIS = {
 }
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
+async def get_models(hass: HomeAssistant, data: dict):
     """Validate the user input allows us to connect."""
     url = data.get(CONF_BASE, "")
     key = data.get(CONF_API_KEY, "")
@@ -55,7 +55,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
         error = resp.get("error", resp) if isinstance(resp, dict) else resp
         text = error.get("message") or str(error)
         raise web_exceptions.HTTPUnauthorized(body=text)
-    LOGGER.info('validate_input: %s', [data, resp, res])
+    LOGGER.info("Got models: %s", [data, resp, res])
+    return resp.get("data") or []
 
 class HasAttrs:
     attrs = None
@@ -104,7 +105,7 @@ class BasicFlow(config_entries.ConfigEntryBaseFlow, HasAttrs):
             base = base.replace("/chat/completions", "")
             user_input[CONF_BASE] = base
             try:
-                await validate_input(self.hass, user_input)
+                await get_models(self.hass, user_input)
             except client_exceptions.ClientConnectionError:
                 errors["base"] = "cannot_connect"
             except web_exceptions.HTTPUnauthorized as exc:
@@ -159,7 +160,7 @@ class ConfigFlow(config_entries.ConfigFlow, BasicFlow, domain=DOMAIN):
 
 class OptionsFlow(config_entries.OptionsFlow, BasicFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry):
-        self.config_entry = config_entry
+        pass
 
 
 class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
@@ -173,8 +174,17 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
             sub.data[CONF_MODEL]
             for sub in entry.subentries.values()
         ]
+        models = SERVICES.get(base, {}).get("models", [])
+        try:
+            api_models = await get_models(self.hass, dict(entry.data))
+            for item in api_models:
+                m = item.get("id")
+                if m and m not in models:
+                    models.append(m)
+        except Exception:
+            pass
         model = ""
-        for m in SERVICES.get(base, {}).get("models", []):
+        for m in models:
             if m not in added_models:
                 model = m
                 break
@@ -195,7 +205,7 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
         if user_input is not None:
             if not user_input.get(CONF_LLM_HASS_API):
                 user_input.pop(CONF_LLM_HASS_API, None)
-            name = user_input.get(CONF_NAME, "")
+            name = user_input.get(CONF_NAME) or 'Agent'
             model = user_input[CONF_MODEL]
             if self.source == "user":
                 return self.async_create_entry(
