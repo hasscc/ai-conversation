@@ -64,6 +64,28 @@
       "abort": {
         "reconfigure_successful": "配置成功"
       }
+    },
+    "tts": {
+      "entry_type": "文本转语音模型",
+      "initiate_flow": {
+        "user": "添加TTS模型",
+        "reconfigure": "配置TTS模型"
+      },
+      "step": {
+        "init": {
+          "description": "{tip}",
+          "data": {
+            "model": "模型",
+            "extra_body": "额外的请求参数(yaml)"
+          },
+          "data_description": {
+            "model": "指定支持文本转语音的模型"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "配置成功"
+      }
     }
   },
   "entity": {}

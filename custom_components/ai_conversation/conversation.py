@@ -16,7 +16,7 @@ from .schemas import *
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
     """Set up conversation entities."""
     for subentry_id, subentry in config_entry.subentries.items():
-        if subentry.subentry_type != "conversation":
+        if subentry.subentry_type != ENTITY_DOMAIN:
             continue
         entry = await HassEntry.async_init(hass, config_entry)
         async_add_entities(

@@ -81,12 +81,20 @@ class HassEntry:
         self.session = async_create_clientsession(self.hass, base_url=f"{base_url}/")
         return self.session
 
-    async def async_chat_completions(self, data: ChatCompletions):
-        http = self.get_http_session()
-        headers = {
+    def get_http_headers(self, headers=None):
+        return {
             hdrs.AUTHORIZATION: f"Bearer {self.get_config(CONF_API_KEY)}",
+            **(headers or {}),
         }
-        res = await http.post('chat/completions', json=data, headers=headers)
+
+    async def async_post(self, api, data: dict):
+        http = self.get_http_session()
+        headers = self.get_http_headers()
+        LOGGER.debug("POST to %s: %s", api, data)
+        return await http.post(api, json=data, headers=headers)
+
+    async def async_chat_completions(self, data: ChatCompletions):
+        res = await self.async_post("chat/completions", data)
         result = ChatCompletionsResult(await res.json())
         result.response = res
         return result

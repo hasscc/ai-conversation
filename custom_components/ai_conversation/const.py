@@ -23,4 +23,5 @@ CONF_PROMPT = "prompt"
 
 PLATFORMS = (
     Platform.CONVERSATION,
+    Platform.TTS,
 )
