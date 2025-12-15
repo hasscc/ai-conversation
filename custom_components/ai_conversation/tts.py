@@ -105,8 +105,7 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
                 if not (msg := chunk.strip()):
                     continue
                 LOGGER.debug("Streaming tts chunk: %s", msg)
-                yield await self.hass.async_add_executor_job(
-                    self._process_tts_audio,
+                yield await self._process_tts_audio(
                     msg,
                     request.language,
                     request.options,
