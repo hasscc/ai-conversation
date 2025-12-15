@@ -9,6 +9,6 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/hasscc/ai-conversation/discussions",
-  "requirements": ["voluptuous-openapi>=0.1.0"],
+  "requirements": ["voluptuous-openapi>=0.1.0", "sentence-stream>=1.0.0"],
   "version": "0.1.0"
 }

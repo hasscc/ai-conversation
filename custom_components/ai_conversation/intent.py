@@ -50,8 +50,8 @@ class AiConvertTextToSound(intent.IntentHandler):
         params = {
             "token": token,
             "message": "base64:" + urlsafe_b64encode(message.encode()).decode(),
-            "speed": slots.get("speed", {}).get("value") or 0,
-            "entity_id": slots.get("entity_id", {}).get("value"),
+            "speed": slots.get("speed", {}).get("value") or 1,
+            "entity_id": slots.get("entity_id", {}).get("value") or "",
         }
         api = f"/api/tts_proxy/{DOMAIN}/{filename}?{urlencode(params)}"
         url = get_url(hass, prefer_external=True) + api

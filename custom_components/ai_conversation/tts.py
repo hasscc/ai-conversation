@@ -4,14 +4,18 @@ from homeassistant.components.tts import (
     DOMAIN as ENTITY_DOMAIN,
     TextToSpeechEntity as BaseEntity,
     TtsAudioType,
+    TTSAudioRequest,
+    TTSAudioResponse,
     ATTR_VOICE,
     async_create_stream,
 )
 from homeassistant.const import ATTR_MODEL
 from homeassistant.util import ulid
+from collections.abc import AsyncGenerator
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.components.http import HomeAssistantView, KEY_HASS, KEY_AUTHENTICATED
+from sentence_stream import async_stream_to_sentences
 
 from . import HassEntry, BasicEntity
 from .const import *
@@ -56,13 +60,25 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
         })
         self._attr_extra_state_attributes["access_tokens"] = access_tokens.copy()
 
-    async def async_get_tts_audio(
-        self, message: str, language: str, options: dict[str, Any]
-    ) -> TtsAudioType:
+    def get_extra(self, field=None):
         extra = self.subentry.data.get("extra_body") or {}
         if not isinstance(extra, dict):
             extra = {}
-        format = options.get(ATTR_FORMAT) or extra.get(ATTR_FORMAT) or "mp3"
+        if field:
+            return extra.get(field)
+        return extra
+
+    async def async_get_tts_audio(
+        self, message: str, language: str, options: dict[str, Any]
+    ) -> TtsAudioType:
+        format = options.get(ATTR_FORMAT) or self.get_extra(ATTR_FORMAT) or "mp3"
+        stream = await self._process_tts_audio(message, language, options)
+        return (format, stream)
+
+    async def _process_tts_audio(
+        self, message: str, language: str, options: dict[str, Any]
+    ):
+        extra = self.get_extra()
         res = await self.entry.async_post("audio/speech", {
             **extra,
             "input": message,
@@ -74,7 +90,55 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
         if not stream or stream[0:1] == b"{":
             LOGGER.warning("TTS error: %s", stream.decode() or res.headers)
             raise HomeAssistantError(f"TTS error: {stream.decode() or res.headers}")
-        return (format, stream)
+        return stream
+
+    async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
+        return TTSAudioResponse("mp3", self._process_tts_stream(request))
+
+    async def _process_tts_stream(self, request: TTSAudioRequest) -> AsyncGenerator[bytes]:
+        """Generate speech from an incoming message."""
+        LOGGER.debug("Starting TTS Stream with options: %s", request.options)
+        count = 0
+        async for message in async_stream_to_sentences(request.message_gen):
+            count += 1
+            for chunk in self.split_text(message, 2 ** count * 10):
+                if not (msg := chunk.strip()):
+                    continue
+                LOGGER.debug("Streaming tts chunk: %s", msg)
+                yield await self.hass.async_add_executor_job(
+                    self._process_tts_audio,
+                    msg,
+                    request.language,
+                    request.options,
+                )
+
+    def split_text(self, text: str, min_length: int = 100) -> list[str]:
+        separators = ['\n', '。', '.', '，', ',']
+        if len(text) <= min_length:
+            return [text]
+        segments = []
+        current_pos = 0
+        text_len = len(text)
+        while current_pos < text_len:
+            search_start_pos = current_pos + min_length
+            if search_start_pos >= text_len:
+                remaining_text = text[current_pos:]
+                if remaining_text.strip():
+                    segments.append(remaining_text)
+                break
+            best_split_pos = -1
+            search_text = text[search_start_pos:]
+            for sep in separators:
+                found_index = search_text.find(sep)
+                if found_index != -1:
+                    best_split_pos = search_start_pos + found_index
+                    break
+            if best_split_pos == -1:
+                best_split_pos = current_pos + min_length
+            segment = text[current_pos:best_split_pos + 1]
+            segments.append(segment)
+            current_pos = best_split_pos + 1
+        return segments
 
 
 class AiTtsProxyView(HomeAssistantView):
