@@ -268,6 +268,7 @@ class TtsFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
 
         schema = {
             vol.Required(CONF_MODEL): str,
+            vol.Optional("full_input"): bool,
             vol.Optional("extra_body"): ObjectSelector(),
         }
         return self.async_show_form(

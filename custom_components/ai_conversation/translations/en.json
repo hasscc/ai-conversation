@@ -76,10 +76,12 @@
           "description": "{tip}",
           "data": {
             "model": "模型",
+            "full_input": "完整输入内容",
             "extra_body": "额外的请求参数(yaml)"
           },
           "data_description": {
-            "model": "指定支持文本转语音的模型"
+            "model": "指定支持文本转语音的模型",
+            "full_input": "要求输入的文本内容必须完整"
           }
         }
       },

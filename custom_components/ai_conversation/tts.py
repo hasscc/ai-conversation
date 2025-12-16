@@ -78,19 +78,28 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
     async def _process_tts_audio(
         self, message: str, language: str, options: dict[str, Any]
     ):
+        stream = b""
+        async for chunk in self._process_tts_audio_chunked(message, language, options):
+            stream += chunk
+        if not stream or stream[0:1] == b"{":
+            LOGGER.warning("TTS error: %s", stream.decode())
+            raise HomeAssistantError(f"TTS error: {stream.decode()}")
+        return stream
+
+    async def _process_tts_audio_chunked(
+        self, message: str, language: str, options: dict[str, Any]
+    ):
         extra = self.get_extra()
         res = await self.entry.async_post("audio/speech", {
             **extra,
             "input": message,
             "model": options.get(ATTR_MODEL) or extra.get(ATTR_MODEL) or self.model,
             "voice": options.get(ATTR_VOICE) or extra.get(ATTR_VOICE),
-            "response_format": format,
+            "response_format": options.get(ATTR_FORMAT) or self.get_extra(ATTR_FORMAT) or "mp3",
         })
-        stream = await res.read()
-        if not stream or stream[0:1] == b"{":
-            LOGGER.warning("TTS error: %s", stream.decode() or res.headers)
-            raise HomeAssistantError(f"TTS error: {stream.decode() or res.headers}")
-        return stream
+        res.raise_for_status()
+        async for chunk in res.content.iter_chunked(1024 * 10):
+            yield chunk
 
     async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
         return TTSAudioResponse("mp3", self._process_tts_stream(request))
@@ -98,46 +107,26 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
     async def _process_tts_stream(self, request: TTSAudioRequest) -> AsyncGenerator[bytes]:
         """Generate speech from an incoming message."""
         LOGGER.debug("Starting TTS Stream with options: %s", request.options)
-        count = 0
-        async for message in async_stream_to_sentences(request.message_gen):
-            count += 1
-            for chunk in self.split_text(message, 2 ** count * 10):
-                if not (msg := chunk.strip()):
-                    continue
-                LOGGER.debug("Streaming tts chunk: %s", msg)
-                yield await self._process_tts_audio(
-                    msg,
-                    request.language,
-                    request.options,
-                )
-
-    def split_text(self, text: str, min_length: int = 100) -> list[str]:
-        separators = ['\n', '。', '.', '，', ',']
-        if len(text) <= min_length:
-            return [text]
-        segments = []
-        current_pos = 0
-        text_len = len(text)
-        while current_pos < text_len:
-            search_start_pos = current_pos + min_length
-            if search_start_pos >= text_len:
-                remaining_text = text[current_pos:]
-                if remaining_text.strip():
-                    segments.append(remaining_text)
-                break
-            best_split_pos = -1
-            search_text = text[search_start_pos:]
-            for sep in separators:
-                found_index = search_text.find(sep)
-                if found_index != -1:
-                    best_split_pos = search_start_pos + found_index
-                    break
-            if best_split_pos == -1:
-                best_split_pos = current_pos + min_length
-            segment = text[current_pos:best_split_pos + 1]
-            segments.append(segment)
-            current_pos = best_split_pos + 1
-        return segments
+        if self.subentry.data.get("full_input"):
+            message = "".join([chunk async for chunk in request.message_gen])
+            yield await self._process_tts_audio(message, request.language, request.options)
+        else:
+            separators = "\n。.，,；;！!？?、"
+            buffer = ""
+            count = 0
+            async for message in request.message_gen:
+                LOGGER.debug("Streaming tts sentence: %s", message)
+                count += 1
+                min_len = 2 ** count * 10
+                for char in message:
+                    buffer += char
+                    msg = buffer.strip()
+                    if len(msg) >= min_len and char in separators:
+                        buffer = ""
+                        async for chunk in self._process_tts_audio_chunked(msg, request.language, request.options):
+                            yield chunk
+            if msg := buffer.strip():
+                yield await self._process_tts_audio(msg, request.language, request.options)
 
 
 class AiTtsProxyView(HomeAssistantView):
