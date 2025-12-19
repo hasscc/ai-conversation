@@ -94,11 +94,12 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
             **extra,
             "input": message,
             "model": options.get(ATTR_MODEL) or extra.get(ATTR_MODEL) or self.model,
-            "voice": options.get(ATTR_VOICE) or extra.get(ATTR_VOICE),
+            "voice": options.get(ATTR_VOICE) or extra.get(ATTR_VOICE, ""),
+            "speed": options.get(ATTR_SPEED) or extra.get(ATTR_SPEED, "1.0"),
             "response_format": options.get(ATTR_FORMAT) or self.get_extra(ATTR_FORMAT) or "mp3",
         })
         res.raise_for_status()
-        async for chunk in res.content.iter_chunked(1024 * 10):
+        async for chunk in res.content.iter_any():
             yield chunk
 
     async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
