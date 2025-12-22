@@ -35,7 +35,7 @@ wget -O - https://get.hacs.vip | DOMAIN=ai_conversation REPO_PATH=hasscc/ai-conv
 ```yaml
 action: ai_conversation.explain_media
 data:
-  entity_id: conversation.agent_glm_4_1v_thinking_flash
+  entity_id: conversation.agent_glm_4_6v_flash
   prompt: Explain this video
   video: https://ha.your.domain/media/local/camera.mp4
   tags:
@@ -79,11 +79,12 @@ You may create a Long-lived access token to allow the client to access the API.
 ```
 If you want to specify a conversation agent, you can add the query parameter `agent_id`.
 ```yaml
-"baseUrl": "http://homeassistant.local:8123/ai_conversation/sse?agent_id=conversation.glm_4_flash",
+"baseUrl": "http://homeassistant.local:8123/ai_conversation/sse?agent_id=conversation.agent_glm_4_6v_flash",
 ```
 
 
 ## Links
 
 - [智谱AI免费模型](https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D)
-- [New API](https://github.com/Calcium-Ion/new-api)
+- [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
+- [New API](https://github.com/QuantumNous/new-api)
