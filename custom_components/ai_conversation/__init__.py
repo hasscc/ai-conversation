@@ -87,11 +87,11 @@ class HassEntry:
             **(headers or {}),
         }
 
-    async def async_post(self, api, data: dict):
+    async def async_post(self, api, json_data=None, **kwargs):
         http = self.get_http_session()
         headers = self.get_http_headers()
-        LOGGER.debug("POST to %s: %s", api, data)
-        return await http.post(api, json=data, headers=headers)
+        LOGGER.debug("POST to %s: %s", api, json_data)
+        return await http.post(api, json=json_data, headers=headers, **kwargs)
 
     async def async_chat_completions(self, data: ChatCompletions):
         res = await self.async_post("chat/completions", data)

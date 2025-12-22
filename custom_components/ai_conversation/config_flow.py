@@ -149,6 +149,7 @@ class ConfigFlow(config_entries.ConfigFlow, BasicFlow, domain=DOMAIN):
         return {
             "conversation": ConversationFlowHandler,
             "tts": TtsFlowHandler,
+            "stt": SttFlowHandler,
         }
 
     @staticmethod
@@ -239,8 +240,6 @@ class ConversationFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
 
 
 class TtsFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
-    """Handle subentry flow."""
-
     async def async_step_user(self, user_input=None):
         """Add a subentry."""
         defaults = {CONF_MODEL: ""}
@@ -269,6 +268,44 @@ class TtsFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
         schema = {
             vol.Required(CONF_MODEL): str,
             vol.Optional("full_input"): bool,
+            vol.Optional("extra_body"): ObjectSelector(),
+        }
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(vol.Schema(schema), defaults),
+            errors=errors,
+            description_placeholders={"tip": self.tip},
+        )
+
+
+class SttFlowHandler(config_entries.ConfigSubentryFlow, HasAttrs):
+    async def async_step_user(self, user_input=None):
+        """Add a subentry."""
+        defaults = {CONF_MODEL: ""}
+        return await self.async_step_init(user_input, defaults)
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Handle reconfiguration of a subentry."""
+        defaults = self._get_reconfigure_subentry().data.copy()
+        return await self.async_step_init(user_input, defaults)
+
+    async def async_step_init(self, user_input=None, defaults=None):
+        """User flow to create a subentry."""
+        errors = {}
+        if user_input is not None:
+            model = user_input[CONF_MODEL]
+            if self.source == "user":
+                return self.async_create_entry(
+                    title=f"STT ({model})".strip(), data=user_input
+                )
+            return self.async_update_and_abort(
+                self._get_entry(),
+                self._get_reconfigure_subentry(),
+                data=user_input,
+            )
+
+        schema = {
+            vol.Required(CONF_MODEL): str,
             vol.Optional("extra_body"): ObjectSelector(),
         }
         return self.async_show_form(

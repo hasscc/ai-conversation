@@ -11,11 +11,8 @@ from homeassistant.components.tts import (
 )
 from homeassistant.const import ATTR_MODEL
 from homeassistant.util import ulid
-from collections.abc import AsyncGenerator
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.components.http import HomeAssistantView, KEY_HASS, KEY_AUTHENTICATED
-from sentence_stream import async_stream_to_sentences
+from collections.abc import AsyncGenerator
 
 from . import HassEntry, BasicEntity
 from .const import *
@@ -26,7 +23,6 @@ ATTR_FORMAT = "response_format"
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
-    """Set up conversation entities."""
     for subentry_id, subentry in config_entry.subentries.items():
         if subentry.subentry_type != ENTITY_DOMAIN:
             continue
@@ -48,7 +44,6 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
         self._attr_supported_languages = [self.hass.config.language]
         self._attr_supported_options = [ATTR_VOICE, ATTR_MODEL, ATTR_SPEED, ATTR_GAIN, ATTR_FORMAT]
         self._attr_extra_state_attributes = {}
-        self.session = async_get_clientsession(self.hass, verify_ssl=False)
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
