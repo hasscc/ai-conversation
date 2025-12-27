@@ -28,6 +28,9 @@ wget -O - https://get.hacs.vip | DOMAIN=ai_conversation REPO_PATH=hasscc/ai-conv
 
 [![Config AI Conversation](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ai_conversation)
 
+1. Add Service / 添加服务(模型提供商)
+2. Add AI Model / 添加对话/STT/TTS模型
+
 
 ## Actions
 
@@ -85,6 +88,7 @@ If you want to specify a conversation agent, you can add the query parameter `ag
 
 ## Links
 
-- [智谱AI免费模型](https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D)
+- [智谱AI免费不限量模型](https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D)
+- [免费STT模型: Qwen3 ASR](https://github.com/aahl/qwen-asr2api) / [加载项](https://gitee.com/hasscc/addons/tree/main/qwen-asr)
 - [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
 - [New API](https://github.com/QuantumNous/new-api)
