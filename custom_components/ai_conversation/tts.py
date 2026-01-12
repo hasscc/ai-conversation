@@ -107,7 +107,7 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
             message = "".join([chunk async for chunk in request.message_gen])
             yield await self._process_tts_audio(message, request.language, request.options)
         else:
-            separators = "\n。.，,；;！!？?、"
+            separators = ["\n", "。", ". ", "，", ", ", "；", "; ", "！", "! ", "？", "? ", "、"]
             buffer = ""
             count = 0
             async for message in request.message_gen:
@@ -117,7 +117,9 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
                 for char in message:
                     buffer += char
                     msg = buffer.strip()
-                    if len(msg) >= min_len and char in separators:
+                    if len(msg) < min_len:
+                        continue
+                    if char in separators or buffer[-2:] in separators:
                         buffer = ""
                         async for chunk in self._process_tts_audio_chunked(msg, request.language, request.options):
                             yield chunk
