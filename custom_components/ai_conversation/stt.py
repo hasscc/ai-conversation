@@ -103,7 +103,11 @@ class SpeechToTextEntity(BasicEntity, BaseEntity):
         if str(text).startswith("{"):
             try:
                 data = json.loads(text) or {}
-                text = data.get("text", text)
+                if txt := data.get("text"):
+                    text = txt
+                else:
+                    LOGGER.warning("Failed to get text from json: %s", text)
+                    return SpeechResult(text, SpeechResultState.ERROR)
             except Exception:
                 LOGGER.warning("Failed to parse json: %s", text, exc_info=True)
         return SpeechResult(text, SpeechResultState.SUCCESS)
