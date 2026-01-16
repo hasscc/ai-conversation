@@ -15,6 +15,11 @@ from homeassistant.util import uuid
 
 from .const import *
 
+try:
+    from mcp.shared.message import SessionMessage  # ha>=2025.10,mcp>=1.14.1
+except (ImportError, ModuleNotFoundError):
+    SessionMessage = None
+
 _LOGGER = logging.getLogger(__name__)
 MESSAGES_API = f"/{DOMAIN}/messages/{{session_id}}"
 
@@ -42,15 +47,17 @@ class ModelContextProtocolSSEView(HomeAssistantView):
         if not agent_id:
             from . import HassEntry
             for entry in HassEntry.ALL.values():
-                if not entry.get_config(CONF_LLM_HASS_API):
-                    continue
                 for entity in entry.entities.values():
                     if not isinstance(entity, conversation.ConversationEntity):
+                        continue
+                    if not entity.subentry.data.get(CONF_LLM_HASS_API):
                         continue
                     agent_id = entity.entity_id
                     break
         elif "." not in agent_id:
             agent_id = f"{conversation.DOMAIN}.{agent_id}"
+        if not agent_id:
+            raise HTTPNotFound(text="Could not find Agent ID")
 
         read_stream: MemoryObjectReceiveStream[types.JSONRPCMessage | Exception]
         read_stream_writer: MemoryObjectSendStream[types.JSONRPCMessage | Exception]
@@ -71,7 +78,11 @@ class ModelContextProtocolSSEView(HomeAssistantView):
 
             async def sse_reader() -> None:
                 """Forward MCP server responses to the client."""
-                async for message in write_stream_reader:
+                async for session_message in write_stream_reader:
+                    if SessionMessage is not None and isinstance(session_message, SessionMessage):
+                        message = session_message.message
+                    else:
+                        message = session_message
                     _LOGGER.debug("Sending SSE message: %s", message)
                     await response.send(
                         message.model_dump_json(by_alias=True, exclude_none=True),
@@ -114,6 +125,8 @@ class ModelContextProtocolMessagesView(HomeAssistantView):
             raise HTTPBadRequest(text="Could not parse message") from err
 
         _LOGGER.debug("Received client message: %s", message)
+        if SessionMessage:
+            message = SessionMessage(message)
         await read_stream_writer.send(message)
         return web.Response(status=200)
 
