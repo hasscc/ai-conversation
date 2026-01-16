@@ -20,6 +20,7 @@ from .const import *
 ATTR_GAIN = "gain"
 ATTR_SPEED = "speed"
 ATTR_FORMAT = "response_format"
+SUPPORTED_OPTIONS = [ATTR_VOICE, ATTR_MODEL, ATTR_SPEED, ATTR_GAIN, ATTR_FORMAT]
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
@@ -42,7 +43,7 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
     def on_init(self):
         self._attr_default_language = self.hass.config.language
         self._attr_supported_languages = [self.hass.config.language]
-        self._attr_supported_options = [ATTR_VOICE, ATTR_MODEL, ATTR_SPEED, ATTR_GAIN, ATTR_FORMAT]
+        self._attr_supported_options = [*SUPPORTED_OPTIONS]
         self._attr_extra_state_attributes = {}
 
     async def async_added_to_hass(self):
@@ -156,14 +157,16 @@ class AiTtsProxyView(HomeAssistantView):
         if not entity_id:
             return self.json({"error": "tts entity not found"}, 400)
 
+        options = {}
+        for attr in SUPPORTED_OPTIONS:
+            if (val := request.query.get(attr)) is not None:
+                options[attr] = val
+
         try:
             stream = async_create_stream(
                 hass, entity_id,
                 language=request.query.get("language"),
-                options={
-                    ATTR_VOICE: request.query.get(ATTR_VOICE),
-                    ATTR_SPEED: request.query.get(ATTR_SPEED),
-                },
+                options=options,
             )
         except Exception as err:
             return self.json({"error": str(err)}, 400)
