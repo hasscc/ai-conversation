@@ -6,8 +6,8 @@ from homeassistant.components.tts import (
     TtsAudioType,
     TTSAudioRequest,
     TTSAudioResponse,
+    DATA_TTS_MANAGER,
     ATTR_VOICE,
-    async_create_stream,
 )
 from homeassistant.const import ATTR_MODEL
 from homeassistant.util import ulid
@@ -163,8 +163,9 @@ class AiTtsProxyView(HomeAssistantView):
                 options[attr] = val
 
         try:
-            stream = async_create_stream(
-                hass, entity_id,
+            stream = hass.data[DATA_TTS_MANAGER].async_create_result_stream(
+                engine=entity_id,
+                use_file_cache=not request.query.get("nocache"),
                 language=request.query.get("language"),
                 options=options,
             )
