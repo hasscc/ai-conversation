@@ -64,11 +64,19 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
             return extra.get(field)
         return extra
 
+    def get_response_format(self, options: dict):
+        return (
+            options.get(ATTR_FORMAT) or
+            self.get_extra(ATTR_FORMAT) or
+            self.get_extra("response_format") or
+            ""
+        )
+
     async def async_get_tts_audio(
         self, message: str, language: str, options: dict[str, Any]
     ) -> TtsAudioType:
-        format = options.get(ATTR_FORMAT) or self.get_extra(ATTR_FORMAT) or "mp3"
         stream = await self._process_tts_audio(message, language, options)
+        format = self.get_response_format(options) or "wav"
         return (format, stream)
 
     async def _process_tts_audio(
@@ -85,21 +93,28 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
     async def _process_tts_audio_chunked(
         self, message: str, language: str, options: dict[str, Any]
     ):
-        extra = self.get_extra()
-        res = await self.entry.async_post("audio/speech", {
-            **extra,
+        params = {
+            **self.get_extra(),
             "input": message,
-            "model": options.get(ATTR_MODEL) or extra.get(ATTR_MODEL) or self.model,
-            "voice": options.get(ATTR_VOICE) or extra.get(ATTR_VOICE, ""),
-            "speed": options.get(ATTR_SPEED) or extra.get(ATTR_SPEED, "1.0"),
-            "response_format": options.get(ATTR_FORMAT) or self.get_extra(ATTR_FORMAT) or "mp3",
-        })
+        }
+        if model := options.get(ATTR_MODEL) or params.get(ATTR_MODEL) or self.model:
+            params[ATTR_MODEL] = model
+        if voice := options.get(ATTR_VOICE) or params.get(ATTR_VOICE, ""):
+            params[ATTR_VOICE] = voice
+        if speed := options.get(ATTR_SPEED) or params.get(ATTR_SPEED, ""):
+            params[ATTR_SPEED] = speed
+        if val := options.get(ATTR_FORMAT) or params.get(ATTR_FORMAT, ""):
+            params["response_format"] = val
+        res = await self.entry.async_post("audio/speech", params)
         res.raise_for_status()
+        if res.content_type == "audio/mp3":
+            options[ATTR_FORMAT] = "mp3"
         async for chunk in res.content.iter_any():
             yield chunk
 
     async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
-        return TTSAudioResponse("mp3", self._process_tts_stream(request))
+        format = self.get_response_format(request.options) or "wav"
+        return TTSAudioResponse(format, self._process_tts_stream(request))
 
     async def _process_tts_stream(self, request: TTSAudioRequest) -> AsyncGenerator[bytes]:
         """Generate speech from an incoming message."""

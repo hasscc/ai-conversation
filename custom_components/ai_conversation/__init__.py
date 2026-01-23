@@ -82,8 +82,11 @@ class HassEntry:
         return self.session
 
     def get_http_headers(self, headers=None):
+        extra = {}
+        if apikey := self.get_config(CONF_API_KEY):
+            extra[hdrs.AUTHORIZATION] = f"Bearer {apikey}"
         return {
-            hdrs.AUTHORIZATION: f"Bearer {self.get_config(CONF_API_KEY)}",
+            **extra,
             **(headers or {}),
         }
 
