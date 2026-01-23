@@ -38,7 +38,7 @@ wget -O - https://get.hacs.vip | DOMAIN=ai_conversation REPO_PATH=hasscc/ai-conv
 ```yaml
 action: ai_conversation.explain_media
 data:
-  entity_id: conversation.agent_glm_4_6v_flash
+  entity_id: conversation.agent_glm_4_7v_flash
   prompt: Explain this video
   video: https://ha.your.domain/media/local/camera.mp4
   tags:
@@ -82,13 +82,14 @@ You may create a Long-lived access token to allow the client to access the API.
 ```
 If you want to specify a conversation agent, you can add the query parameter `agent_id`.
 ```yaml
-"baseUrl": "http://homeassistant.local:8123/ai_conversation/sse?agent_id=conversation.agent_glm_4_6v_flash",
+"baseUrl": "http://homeassistant.local:8123/ai_conversation/sse?agent_id=conversation.agent_glm_4_7v_flash",
 ```
 
 
 ## Links
 
 - [智谱AI免费不限量模型](https://www.bigmodel.cn/invite?icode=EwilDKx13%2FhyODIyL%2BKabHHEaazDlIZGj9HxftzTbt4%3D)
-- [免费STT模型: Qwen3 ASR](https://github.com/aahl/qwen-asr2api) / [加载项](https://gitee.com/hasscc/addons/tree/main/qwen-asr)
+- [免费STT模型: Qwen ASR](https://github.com/aahl/qwen-asr2api) / [加载项](https://gitee.com/hasscc/addons/tree/main/qwen-asr)
+- [免费TTS模型: Z.ai TTS](https://github.com/aahl/zai-tts2api) / [加载项](https://gitee.com/hasscc/addons/tree/main/zai-tts)
 - [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
 - [New API](https://github.com/QuantumNous/new-api)
