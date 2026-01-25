@@ -1,3 +1,5 @@
+import io
+import wave
 from aiohttp import web
 from base64 import urlsafe_b64decode
 from homeassistant.components.tts import (
@@ -123,24 +125,48 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
             message = "".join([chunk async for chunk in request.message_gen])
             yield await self._process_tts_audio(message, request.language, request.options)
         else:
-            separators = ["\n", "。", ". ", "，", ", ", "；", "; ", "！", "! ", "？", "? ", "、"]
-            buffer = ""
-            count = 0
-            async for message in request.message_gen:
-                LOGGER.debug("Streaming tts sentence: %s", message)
-                count += 1
-                min_len = 2 ** count * 10
-                for char in message:
-                    buffer += char
-                    msg = buffer.strip()
-                    if len(msg) < min_len:
-                        continue
-                    if char in separators or buffer[-2:] in separators:
-                        buffer = ""
-                        async for chunk in self._process_tts_audio_chunked(msg, request.language, request.options):
-                            yield chunk
-            if msg := buffer.strip():
-                yield await self._process_tts_audio(msg, request.language, request.options)
+            async for sentence in self.spilt_sentences(request.message_gen):
+                LOGGER.debug("Streaming tts sentence: %s", sentence)
+                audio_gen = self._process_tts_audio_chunked(sentence, request.language, request.options)
+                async for chunk in self.fix_wav_header(audio_gen):
+                    yield chunk
+
+    async def fix_wav_header(self, stream):
+        wav_header_sent = False
+        async for chunk in stream:
+            if chunk.startswith(b"RIFF") and b"WAVE" in chunk:
+                with io.BytesIO(chunk) as f, wave.open(f, 'rb') as w:
+                    chunk = w.readframes(w.getnframes())
+                    if not wav_header_sent:
+                        header_buf = io.BytesIO()
+                        with wave.open(header_buf, 'wb') as out_w:
+                            out_w.setparams(w.getparams())
+                            out_w.setnframes(0)
+                        header = bytearray(header_buf.getvalue())
+                        header[ 4: 8] = b'\xff\xff\xff\xff'
+                        header[40:44] = b'\xff\xff\xff\xff'
+                        chunk = header + chunk
+                        wav_header_sent = True
+            yield chunk
+
+    async def spilt_sentences(self, message_gen):
+        separators = ["\n", "。", ". ", "，", ", ", "；", "; ", "！", "! ", "？", "? ", "、"]
+        buffer = ""
+        count = 0
+        async for message in message_gen:
+            LOGGER.debug("Streaming tts message: %s", message)
+            count += 1
+            min_len = 2 ** count * 10
+            for char in message:
+                buffer += char
+                msg = buffer.strip()
+                if len(msg) < min_len:
+                    continue
+                if char in separators or buffer[-2:] in separators:
+                    buffer = ""
+                    yield msg
+        if msg := buffer.strip():
+            yield msg
 
 
 class AiTtsProxyView(HomeAssistantView):
