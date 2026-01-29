@@ -81,6 +81,10 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
         format = self.get_response_format(options) or "wav"
         return (format, stream)
 
+    async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
+        format = self.get_response_format(request.options) or "wav"
+        return TTSAudioResponse(format, self._process_tts_stream(request))
+
     async def _process_tts_audio(
         self, message: str, language: str, options: dict[str, Any]
     ):
@@ -108,15 +112,19 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
         if val := options.get(ATTR_FORMAT) or params.get(ATTR_FORMAT, ""):
             params["response_format"] = val
         res = await self.entry.async_post("audio/speech", params)
+        LOGGER.debug("TTS request: %s", [params, str(res.request_info)])
         res.raise_for_status()
-        if res.content_type == "audio/mp3":
+        if res.content_type in ["audio/mp3", "audio/mpeg"]:
             options[ATTR_FORMAT] = "mp3"
-        async for chunk in res.content.iter_any():
-            yield chunk
-
-    async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
-        format = self.get_response_format(request.options) or "wav"
-        return TTSAudioResponse(format, self._process_tts_stream(request))
+        if res.content_type == "audio/wav":
+            options[ATTR_FORMAT] = "wav"
+        if not res.content_type.startswith("audio/"):
+            LOGGER.warning("Unexpected content type: %s, %s", res.content_type, await res.text())
+            yield b""
+        else:
+            LOGGER.debug("TTS response format: %s", res.content_type)
+            async for chunk in res.content.iter_any():
+                yield chunk
 
     async def _process_tts_stream(self, request: TTSAudioRequest) -> AsyncGenerator[bytes]:
         """Generate speech from an incoming message."""
@@ -202,6 +210,7 @@ class AiTtsProxyView(HomeAssistantView):
         for attr in SUPPORTED_OPTIONS:
             if (val := request.query.get(attr)) is not None:
                 options[attr] = val
+        LOGGER.debug("TTS api options: %s", options)
 
         try:
             stream = hass.data[DATA_TTS_MANAGER].async_create_result_stream(
