@@ -133,19 +133,20 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
             message = "".join([chunk async for chunk in request.message_gen])
             yield await self._process_tts_audio(message, request.language, request.options)
         else:
+            header_sent = False
             async for sentence in self.spilt_sentences(request.message_gen):
                 LOGGER.debug("Streaming tts sentence: %s", sentence)
                 audio_gen = self._process_tts_audio_chunked(sentence, request.language, request.options)
-                async for chunk in self.fix_wav_header(audio_gen):
+                async for chunk in self.fix_wav_header(audio_gen, header_sent):
+                    header_sent = True
                     yield chunk
 
-    async def fix_wav_header(self, stream):
-        wav_header_sent = False
+    async def fix_wav_header(self, stream, header_sent=None):
         async for chunk in stream:
             if chunk.startswith(b"RIFF") and b"WAVE" in chunk:
                 with io.BytesIO(chunk) as f, wave.open(f, 'rb') as w:
                     chunk = w.readframes(w.getnframes())
-                    if not wav_header_sent:
+                    if not header_sent:
                         header_buf = io.BytesIO()
                         with wave.open(header_buf, 'wb') as out_w:
                             out_w.setparams(w.getparams())
@@ -154,7 +155,6 @@ class TextToSpeechEntity(BasicEntity, BaseEntity):
                         header[ 4: 8] = b'\xff\xff\xff\xff'
                         header[40:44] = b'\xff\xff\xff\xff'
                         chunk = header + chunk
-                        wav_header_sent = True
             yield chunk
 
     async def spilt_sentences(self, message_gen):
@@ -210,12 +210,14 @@ class AiTtsProxyView(HomeAssistantView):
         for attr in SUPPORTED_OPTIONS:
             if (val := request.query.get(attr)) is not None:
                 options[attr] = val
-        LOGGER.debug("TTS api options: %s", options)
+        nocache = request.query.get("nocache")
+        use_cache = None if nocache is None else (not nocache)
+        LOGGER.debug("TTS api options: %s, use_cache: %s", options, use_cache)
 
         try:
             stream = hass.data[DATA_TTS_MANAGER].async_create_result_stream(
                 engine=entity_id,
-                use_file_cache=not request.query.get("nocache"),
+                use_file_cache=use_cache,
                 language=request.query.get("language"),
                 options=options,
             )
