@@ -2,6 +2,11 @@ import io
 import wave
 from aiohttp import web
 from base64 import urlsafe_b64decode
+from collections.abc import AsyncGenerator
+from homeassistant.const import ATTR_MODEL
+from homeassistant.util import ulid
+from homeassistant.components.http import HomeAssistantView, KEY_HASS, KEY_AUTHENTICATED
+from homeassistant.components.tts.helper import get_engine_instance
 from homeassistant.components.tts import (
     DOMAIN as ENTITY_DOMAIN,
     TextToSpeechEntity as BaseEntity,
@@ -11,10 +16,6 @@ from homeassistant.components.tts import (
     DATA_TTS_MANAGER,
     ATTR_VOICE,
 )
-from homeassistant.const import ATTR_MODEL
-from homeassistant.util import ulid
-from homeassistant.components.http import HomeAssistantView, KEY_HASS, KEY_AUTHENTICATED
-from collections.abc import AsyncGenerator
 
 from . import HassEntry, BasicEntity
 from .const import *
@@ -206,37 +207,43 @@ class AiTtsProxyView(HomeAssistantView):
         if not entity_id:
             return self.json({"error": "tts entity not found"}, 400)
 
-        options = {}
-        for attr in SUPPORTED_OPTIONS:
-            if (val := request.query.get(attr)) is not None:
-                options[attr] = val
         nocache = request.query.get("nocache")
         use_cache = None if nocache is None else (not nocache)
-        LOGGER.debug("TTS api options: %s, use_cache: %s", options, use_cache)
 
-        try:
-            stream = hass.data[DATA_TTS_MANAGER].async_create_result_stream(
-                engine=entity_id,
-                use_file_cache=use_cache,
-                language=request.query.get("language"),
-                options=options,
-            )
-        except Exception as err:
-            return self.json({"error": str(err)}, 400)
-
-        stream.async_set_message(message)
         response: web.StreamResponse | None = None
-        try:
-            async for data in stream.async_stream_result():
-                if response is None:
-                    response = web.StreamResponse()
-                    response.content_type = stream.content_type
-                    await response.prepare(request)
-                await response.write(data)
-        except Exception as err:
-            LOGGER.error("Error streaming tts", exc_info=True)
-            return self.json({"error": str(err)}, 400)
+        error = None
+        entity_ids = entity_id.split(",")
+        for eid in entity_ids:
+            try:
+                entity = get_engine_instance(hass, eid)
+                if not entity:
+                    continue
+                options = {}
+                for attr in entity.supported_options:
+                    if (val := request.query.get(attr)) is not None:
+                        options[attr] = val
+                LOGGER.debug("%s: TTS api options: %s, use_cache: %s", eid, options, use_cache)
+                stream = hass.data[DATA_TTS_MANAGER].async_create_result_stream(
+                    engine=eid,
+                    use_file_cache=use_cache,
+                    language=request.query.get("language"),
+                    options=options,
+                )
+                stream.async_set_message(message)
+                async for data in stream.async_stream_result():
+                    if response is None:
+                        response = web.StreamResponse()
+                        response.content_type = stream.content_type
+                        await response.prepare(request)
+                    await response.write(data)
+                error = None
+            except Exception as err:
+                error = {"error": str(err)}
+                LOGGER.error("Error streaming tts", exc_info=True)
+
+        if error:
+            return self.json(error, 400)
         if response is None:
-            return web.Response(status=500)
+            return self.json({"error": "Engine not found"}, 400)
         await response.write_eof()
         return response
