@@ -140,8 +140,6 @@ class BasicFlow(config_entries.ConfigEntryBaseFlow, HasAttrs):
 
 
 class ConfigFlow(config_entries.ConfigFlow, BasicFlow, domain=DOMAIN):
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
-
     @classmethod
     @callback
     def async_get_supported_subentry_types(cls, config_entry: ConfigEntry):
